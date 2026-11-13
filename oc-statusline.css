@@ -1,0 +1,14 @@
+/* Statusline strip in the desktop window.bottom slot.
+   color: inherit + opacity keeps it theme-adaptive (light/dark). */
+.oc-statusline {
+  padding: 4px 10px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: inherit;
+  opacity: 0.7;
+}
