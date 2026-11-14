@@ -1,12 +1,11 @@
 {
   "name": "opencode-token-speedometer",
   "version": "0.1.0",
-  "description": "OpenCode statusline widget: live decode/prefill token speeds, session status, model and elapsed time — TUI footer and desktop window strip",
+  "description": "OpenCode desktop statusline widget: live decode/prefill token speeds, session status, model and elapsed time in the window bottom strip",
   "license": "GPL-3.0-only",
   "type": "module",
   "exports": {
     ".": "./index.ts",
-    "./tui": "./tui.tsx",
     "./gui-experimental": "./dist/gui-experimental.cjs"
   },
   "scripts": {

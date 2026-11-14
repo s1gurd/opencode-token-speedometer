@@ -1,6 +1,5 @@
-// Shared event → state logic for the statusline plugin (server-agnostic).
-// Both the TUI and GUI parts feed their respective server event streams
-// into `applyEvent`, so the two halves can never drift apart.
+// Event → state logic for the statusline plugin (server-agnostic).
+// The GUI part feeds its server event stream into `applyEvent`.
 // All timestamps are milliseconds.
 
 import {

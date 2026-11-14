@@ -1,9 +1,6 @@
 # opencode-token-speedometer
 
-A statusline widget for [OpenCode](https://opencode.ai) that shows, at a glance, what the agent is doing right now: **session · status · model · elapsed time · live decode/prefill token speeds**. It renders in two places at once:
-
-- **TUI** — appended to the `home.footer.status` and `prompt.footer.status` footer slots
-- **Desktop (GUI)** — a strip in the `window.bottom` slot of the window
+A statusline widget for the [OpenCode](https://opencode.ai) **desktop app** that shows, at a glance, what the agent is doing right now: **session · status · model · elapsed time · live decode/prefill token speeds**. It renders as a single strip in the `window.bottom` slot of the window.
 
 ## Features
 
@@ -12,7 +9,7 @@ A statusline widget for [OpenCode](https://opencode.ai) that shows, at a glance,
 - **Session status** — `working` / `waiting` / `retrying` / `waiting for permission` (a pending permission always wins)
 - **Elapsed execution time** — counts only while an execution runs
 - **Session + model labels** — last 8 chars of the session id, `provider/model[variant]`
-- **Event-driven, zero polling** — the TUI and GUI halves share one pure event→state module (`events.ts`), so the two renders can never drift apart
+- **Event-driven, zero polling** — one pure event→state module (`events.ts`) feeds the render; a 500 ms tick only refreshes the live pieces (elapsed time, `≈` speed)
 - **Stale-value protection** — speeds are cleared at execution end, on idle (reconciled against the synced session store), and at user-interaction boundaries (question forms, permission prompts), so values from one execution never leak into the next
 
 ## Example line
@@ -25,49 +22,71 @@ Sections are omitted when unknown: no time section when idle, no prefill section
 
 ## Installation
 
-### One-line install (recommended)
+The GUI bundle is prebuilt and committed (`dist/gui-experimental.cjs`), so **no build tools are needed** to install — only a git clone and one config entry.
 
-Add one entry to the `plugin` array in your OpenCode config (`opencode.json`):
+### Recommended: clone + local path
 
-- **Windows**: `%USERPROFILE%\.config\opencode\opencode.json`
-- **macOS / Linux**: `~/.config/opencode/opencode.json`
-
-```json
-{
-  "plugin": [
-    "opencode-token-speedometer@git+https://github.com/s1gurd/opencode-token-speedometer.git"
-  ]
-}
-```
-
-Then restart the OpenCode desktop app (and the background server if you run it separately). No build tools are needed — the GUI bundle is prebuilt and shipped in the repository.
-
-### Manual install
+Clone the plugin into your OpenCode plugin directory:
 
 ```bash
 git clone https://github.com/s1gurd/opencode-token-speedometer.git \
   ~/.config/opencode/plugin/opencode-token-speedometer
 ```
 
-Then add the **absolute path** to the clone as a `plugin` array entry in `opencode.json` (e.g. `C:\Users\you\.config\opencode\plugin\opencode-token-speedometer` on Windows) and restart.
+On Windows (PowerShell):
+
+```powershell
+git clone https://github.com/s1gurd/opencode-token-speedometer.git `
+  "$env:USERPROFILE\.config\opencode\plugin\opencode-token-speedometer"
+```
+
+Then add the **absolute path to the clone** as one entry in the `plugin` array of your OpenCode config (`%USERPROFILE%\.config\opencode\opencode.json` on Windows, `~/.config/opencode/opencode.json` elsewhere):
+
+```json
+{
+  "plugin": [
+    "C:\\Users\\you\\.config\\opencode\\plugin\\opencode-token-speedometer"
+  ]
+}
+```
+
+Keep the other entries that are already in the array. Use `plugin` (singular) — that is the key read by OpenCode 1.19.x.
+
+Restart the desktop app afterwards (and the background server, if you run it separately).
+
+**Updating:** `git -C ~/.config/opencode/plugin/opencode-token-speedometer pull`, then restart (or reload plugins in Settings → Extensions).
+
+### Why not `package@git+https://…`
+
+The one-line spec form
+
+```json
+"opencode-token-speedometer@git+https://github.com/s1gurd/opencode-token-speedometer.git"
+```
+
+does **not** install on OpenCode 1.19.4: its embedded installer spawns the `opencode` binary instead of npm and the install fails with `Unrecognized flag: --force in command opencode` / `git dep preparation failed`. The clone + absolute path method above avoids that code path entirely.
+
+### Only one entry that draws the strip
+
+The bottom strip comes from the `./gui-experimental` bundle declared in `package.json`. Every plugin entry that ships that bundle renders its own strip, so two such entries show the strip **twice**. Keep exactly one entry for this widget, and do not install it alongside another statusline that carries the same GUI bundle.
 
 ### For LLM agents (machine-readable install procedure)
 
 Follow the steps exactly; stop and report if a step fails.
 
 1. **Locate the config file.** Path: `~/.config/opencode/opencode.json` (Unix) or `%USERPROFILE%\.config\opencode\opencode.json` (Windows). Read it. If it does not exist, create it with `{}`.
-2. **Add the plugin entry.** In the top-level `plugin` array (create the array if missing), add the string:
-   `opencode-token-speedometer@git+https://github.com/s1gurd/opencode-token-speedometer.git`
-   Do not remove or reorder existing entries. Save the file as valid JSON.
-3. **Restart OpenCode.** Restart the desktop application; if a background OpenCode server is managed separately, restart it as well (a new plugin target registers on restart).
-4. **Verify.** Expected observations:
-   - TUI footer: a line of the form `…<8 hex chars> · waiting · <provider>/<model>` (at idle).
-   - Desktop: a new strip at the bottom of the window with the same content.
+2. **Clone the plugin** (skip if the directory already exists):
+   `git clone https://github.com/s1gurd/opencode-token-speedometer.git "<config dir>/plugin/opencode-token-speedometer"`
+   where `<config dir>` is the directory containing `opencode.json`.
+3. **Add the plugin entry.** In the top-level `plugin` array (create the array if missing), add the **absolute path** to the clone as a string (JSON-escape the backslashes on Windows: `"C:\\Users\\you\\.config\\opencode\\plugin\\opencode-token-speedometer"`). Do not remove or reorder existing entries, and do not add a second entry for the same widget. Save the file as valid JSON.
+4. **Restart OpenCode.** Restart the desktop application; if a background OpenCode server is managed separately, restart it as well.
+5. **Verify.** Expected observations:
+   - Exactly **one** new strip at the bottom of the desktop window, showing a line of the form `…<8 hex chars> · waiting · <provider>/<model>` at idle.
    - While a response is generating: status becomes `working`, a live `≈ N tok/s` speed appears; after it finishes the status returns to `waiting` and the speeds disappear.
    - When a tool asks for permission: status shows `waiting for permission`.
-5. **Optional dev verification** (clone + Node 22+): `npm install && npm test` → 53/53 pass; `npm run typecheck` → exit 0.
+6. **Optional dev verification** (Node 22+): `npm install && npm test` → 53/53 pass; `npm run typecheck` → exit 0; `npm run build` → `dist/gui-experimental.cjs`.
 
-**Uninstall:** remove the entry from the `plugin` array (and delete the clone directory for manual installs), restart OpenCode.
+**Uninstall:** remove the entry from the `plugin` array, delete the clone directory, restart OpenCode.
 
 ## Behavior reference
 
@@ -88,13 +107,13 @@ Follow the steps exactly; stop and report if a step fails.
 
 ## How it works
 
-- `events.ts` — shared pure event→state logic (`applyEvent`, `getMetrics`, `reconcileIdle`). Both halves feed their server event stream into the same functions; all per-session state is keyed by session id.
+- `events.ts` — pure event→state logic (`applyEvent`, `getMetrics`, `reconcileIdle`). The GUI part feeds its server event stream into these functions; all per-session state is keyed by session id.
 - `metrics.ts` — pure metrics and formatting (`prefillTps`, `decodeTps`, `LiveRate`, `formatLine`, `statusWord`). No OpenCode dependencies, fully unit-tested.
-- `tui.tsx` — TUI entry: footer slots, a 500 ms tick for the live sections, and a status overlay read from the synced session store (the authoritative “is it running” source).
 - `gui.tsx` — desktop entry: the `window.bottom` slot. The host invokes `Slot.render` once outside a tracked owner, so the line is synced imperatively to the DOM from a `createEffect` under a `createKeyed` run (re-runs on every tick and server event).
-- `index.ts` — no-op server part; keeps the package shape valid for auto-loading next to the TUI part.
+- `index.ts` — no-op server part; keeps the package shape valid for auto-loading from the plugin directory. The visible widget is the GUI bundle.
+- `dist/gui-experimental.cjs` — the prebuilt bundle behind the `./gui-experimental` export, i.e. what the desktop app actually loads.
 
-Hosts whose plugin stream does **not** deliver `session.execution.*` events (the desktop sidecar stream is one) are handled by `reconcileIdle` (reconciled against the synced `session.status` store on every render) plus user-interaction boundaries: `form.created` / `form.replied` / `form.cancelled` act as execution boundaries, and `permission.asked` pauses the displayed speeds.
+The desktop sidecar stream does **not** deliver `session.execution.*` events, so execution boundaries are reconstructed from the synced `session.status` store on every render (`reconcileIdle`) plus user-interaction boundaries: `form.created` / `form.replied` / `form.cancelled` act as execution boundaries, and `permission.asked` pauses the displayed speeds.
 
 ## Development
 
@@ -107,13 +126,12 @@ npm run typecheck # tsc --noEmit over the GUI part (tsconfig.gui.json)
 npm run build     # vite build -> dist/gui-experimental.cjs (single CJS bundle, externals kept)
 ```
 
-The `gui()` preset from `@opencode/plugin/gui/vite` compiles Solid JSX and keeps the app-provided modules (`solid-js`, `@opencode/plugin`, …) external. The TUI part (`tui.tsx`) is loaded from source by the OpenCode server; typechecking its JSX intrinsics requires the `@opentui/solid` package (a separate dev harness, not part of this repo).
+The `gui()` preset from `@opencode/plugin/gui/vite` compiles Solid JSX and keeps the app-provided modules (`solid-js`, `@opencode/plugin`, …) external. Only the GUI part is typechecked and bundled here; commit the rebuilt `dist/gui-experimental.cjs` so installs stay build-free.
 
 ## Known limitations
 
 - The live `≈` speed is a heuristic (chars/4 over a 3 s window), not a tokenizer — treat the number as indicative.
-- On desktop hosts the `session.execution.*` events are not delivered to plugin listeners; boundaries are reconstructed from the session store and form/permission events (see above).
-- The TUI may show `≈ 0.0 tok/s` for the first ~500 ms of a step (live estimate not yet ready); the GUI omits the section instead.
+- The `session.execution.*` events are not delivered to desktop plugin listeners; boundaries are reconstructed from the session store and form/permission events (see above).
 - Per-session state is never pruned (a few hundred bytes per session id — negligible in practice).
 
 ## License

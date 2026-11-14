@@ -40,8 +40,8 @@ export default Plugin.define({
       if (m) reconcileIdle(m, running)
       const status: LineInput["status"] = running ? "busy" : m?.status ?? "idle"
 
-      // Model fallback: the model the next prompt is sent with — same
-      // semantics as ui.model.current() in the TUI part.
+      // Model fallback: the model the next prompt is sent with, i.e. the
+      // composer's current selection.
       const promptModel = ctx.screen.current()?.composer.model()
       const inStep = m ? m.stepMessageID !== null : false
       const liveTps = m ? m.live.tps(now) : null
